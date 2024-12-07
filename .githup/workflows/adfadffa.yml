@@ -1,0 +1,64 @@
+name: Build APK for Kivy App
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Checkout the code from the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # 3. Install build dependencies (Kivy, Buildozer)
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install kivy buildozer
+
+      # 4. Install necessary tools (Android SDK and Java)
+      - name: Install Android SDK and dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y openjdk-8-jdk wget unzip
+
+          # Create Android SDK directory and download command line tools
+          mkdir -p $HOME/Android/cmdline-tools
+          cd $HOME/Android/cmdline-tools
+          wget https://dl.google.com/android/repository/commandlinetools-linux-8092744_latest.zip
+          unzip commandlinetools-linux-8092744_latest.zip
+          rm commandlinetools-linux-8092744_latest.zip
+
+          # Setup Android SDK environment variables
+          export ANDROID_HOME=$HOME/Android
+          export PATH=$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PATH
+
+          # Install necessary SDK packages
+          yes | sdkmanager --licenses
+          sdkmanager "platform-tools" "build-tools;29.0.2" "android-29" "tools"
+
+      # 5. Set up Buildozer configuration (buildozer.spec should already exist in the repo)
+      - name: Build APK using Buildozer
+        run: |
+          export ANDROIDSDK=$HOME/Android
+          buildozer android debug
+
+      # 6. Upload the generated APK
+      - name: Upload APK
+        uses: actions/upload-artifact@v3
+        with:
+          name: kivy-app
+          path: bin/*.apk
